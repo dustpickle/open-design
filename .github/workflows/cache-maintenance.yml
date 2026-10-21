@@ -98,6 +98,7 @@ jobs:
       cancel-in-progress: false
     steps:
       - name: Validate source run
+        id: source
         uses: actions/github-script@v8
         env:
           SOURCE_RUN_ID: ${{ inputs.pack_cache_run_id }}
@@ -108,10 +109,20 @@ jobs:
             const { data: run } = await github.rest.actions.getWorkflowRun({ ...context.repo, run_id: Number(id) });
             if (!['push', 'schedule', 'workflow_dispatch', 'release'].includes(run.event)
                 || run.head_repository.full_name !== `${context.repo.owner}/${context.repo.repo}`
-                || run.head_sha !== context.sha
                 || run.head_branch !== context.ref.replace(/^refs\/(heads|tags)\//, '')) {
-              throw new Error('Cache handoff must come from a trusted same-repository, same-ref, same-commit run');
+              throw new Error('Cache handoff must come from a trusted same-repository, same-ref run');
             }
+            // A release can finish after another commit advances its branch.
+            // Admit only ancestors; never consume a diverged or future history.
+            if (run.head_sha !== context.sha) {
+              const { data: comparison } = await github.rest.repos.compareCommitsWithBasehead({
+                ...context.repo, basehead: `${run.head_sha}...${context.sha}`,
+              });
+              if (!['ahead', 'identical'].includes(comparison.status)) {
+                throw new Error('Cache source commit is not in the current ref history');
+              }
+            }
+            core.setOutput('head_sha', run.head_sha);
       - name: Checkout
         uses: actions/checkout@v6.0.2
       - name: Setup Node.js
@@ -137,12 +148,13 @@ jobs:
         shell: pwsh
         env:
           SOURCE_RUN_ID: ${{ inputs.pack_cache_run_id }}
+          SOURCE_HEAD_SHA: ${{ steps.source.outputs.head_sha }}
         run: |
           $entry = Join-Path $env:RUNNER_TEMP "pack-cache-handoff"
           $raw = python .github/scripts/handoff.py validate pack-cache $entry
           if ($LASTEXITCODE -ne 0) { throw "Invalid cache handoff" }
           $data = $raw | ConvertFrom-Json
-          if ([string]$data.run_id -ne $env:SOURCE_RUN_ID -or $data.head_sha -ne $env:GITHUB_SHA -or $data.ref -ne $env:GITHUB_REF -or $data.repository -ne $env:GITHUB_REPOSITORY) {
+          if ([string]$data.run_id -ne $env:SOURCE_RUN_ID -or $data.head_sha -ne $env:SOURCE_HEAD_SHA -or $data.ref -ne $env:GITHUB_REF -or $data.repository -ne $env:GITHUB_REPOSITORY) {
             throw "Cache handoff provenance mismatch"
           }
           $root = Join-Path $env:RUNNER_TEMP "tools-pack-cache"

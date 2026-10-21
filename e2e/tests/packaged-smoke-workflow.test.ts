@@ -7,6 +7,7 @@ import { tmpdir } from "node:os";
 import { delimiter, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
+import { runInNewContext } from "node:vm";
 
 import { describe, expect, it } from "vitest";
 import { parse as parseYaml } from "yaml";
@@ -4300,6 +4301,43 @@ yW/DsIUs5ZzcHza5rw==
 
 
 describe("packaging optimization workflow boundaries", () => {
+  it.each([
+    { name: "same commit", sourceSha: "current", status: "identical", accepted: true },
+    { name: "branch advanced", sourceSha: "previous", status: "ahead", accepted: true },
+    { name: "diverged history", sourceSha: "previous", status: "diverged", accepted: false },
+    { name: "future commit", sourceSha: "previous", status: "behind", accepted: false },
+    { name: "other repository", repository: "other/repo", accepted: false },
+    { name: "other branch", branch: "other", accepted: false },
+    { name: "PR event", event: "pull_request", accepted: false },
+  ])("validates cache provenance when $name", async (scenario) => {
+    const workflow = parseYaml(await readFile(join(workspaceRoot, ".github/workflows/cache-maintenance.yml"), "utf8"));
+    const script = workflow.jobs["save-windows-pack"].steps[0].with.script;
+    const outputs: Record<string, string> = {};
+    const sourceSha = scenario.sourceSha ?? "current";
+    const result = runInNewContext(`(async () => { ${script} })()`, {
+      process: { env: { SOURCE_RUN_ID: "123" } },
+      context: { repo: { owner: "nexu-io", repo: "open-design" }, ref: "refs/heads/test", sha: "current" },
+      core: { setOutput: (key: string, value: string) => { outputs[key] = value; } },
+      github: { rest: {
+        actions: { getWorkflowRun: async () => ({ data: {
+          event: scenario.event ?? "workflow_dispatch", head_repository: { full_name: scenario.repository ?? "nexu-io/open-design" },
+          head_branch: scenario.branch ?? "test", head_sha: sourceSha,
+        } }) },
+        repos: { compareCommitsWithBasehead: async (args: { basehead: string }) => {
+          expect(args.basehead).toBe(`${sourceSha}...current`);
+          return { data: { status: scenario.status } };
+        } },
+      } },
+    });
+    if (scenario.accepted) {
+      await result;
+      expect(outputs.head_sha).toBe(sourceSha);
+    } else {
+      await expect(result).rejects.toThrow();
+      expect(outputs).toEqual({});
+    }
+  });
+
   it("persists Windows caches in an independent workflow after artifacts are published", async () => {
     for (const [file, job] of [[releaseBetaWorkflowPath, "build_win_x64"], [releasePrereleaseWorkflowPath, "build_win"], [releaseStableWorkflowPath, "build_win"]] as const) {
       const workflow = parseYaml(await readFile(file, "utf8"));
@@ -4317,9 +4355,12 @@ describe("packaging optimization workflow boundaries", () => {
     expect(saver.steps.findIndex((step: { name: string }) => step.name === "Validate source run"))
       .toBeLessThan(saver.steps.findIndex((step: { uses?: string }) => step.uses === "actions/download-artifact@v8"));
     const validate = saver.steps.find((step: { name: string }) => step.name === "Validate source run").with.script;
-    expect(validate).toContain("run.head_sha !== context.sha");
+    expect(validate).toContain("compareCommitsWithBasehead");
     expect(validate).toContain("run.head_repository.full_name");
     expect(validate).toContain("run.head_branch !== context.ref");
+    const extract = saver.steps.find((step: { name: string }) => step.name === "Verify and extract cache snapshot");
+    expect(extract.env.SOURCE_HEAD_SHA).toBe("${{ steps.source.outputs.head_sha }}");
+    expect(extract.run).toContain("$data.head_sha -ne $env:SOURCE_HEAD_SHA");
     const composite = await readFile(join(workspaceRoot, ".github/actions/defer-pack-cache/action.yml"), "utf8");
     expect(composite).toContain("handoff.py artifact-name pack-cache windows");
     expect(composite).toContain("gh workflow run cache-maintenance.yml");
