@@ -1182,7 +1182,7 @@ jobs:
         uses: actions/cache/restore@v5
         continue-on-error: true
         with:
-          path: ${{ runner.temp }}\tools-pack-cache
+          path: ${{ runner.temp }}/tools-pack-cache
           key: ${{ steps.win_tools_pack_cache_key.outputs.key }}
           restore-keys: |
             ${{ steps.win_tools_pack_cache_key.outputs.prefix }}

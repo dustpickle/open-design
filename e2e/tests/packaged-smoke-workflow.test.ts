@@ -4347,10 +4347,16 @@ describe("packaging optimization workflow boundaries", () => {
       expect(deferred).toBe(steps.length - 1);
       expect(steps[deferred]["continue-on-error"]).toBe(true);
       expect(steps[deferred].if).toContain("success()");
+      // actions/cache hashes the literal path spelling into the cache version.
+      // A Windows backslash/forward-slash mismatch silently misses every cache.
+      const restore = steps.find((step: { name?: string }) => step.name === "Restore Windows tools-pack cache");
+      expect(restore.with.path).toBe("${{ runner.temp }}/tools-pack-cache");
       expect(JSON.stringify(workflow.jobs.publish.needs)).not.toContain("cache");
     }
     const maintenance = parseYaml(await readFile(join(workspaceRoot, ".github/workflows/cache-maintenance.yml"), "utf8"));
     const saver = maintenance.jobs["save-windows-pack"];
+    expect(saver.steps.find((step: { id?: string }) => step.id === "save").with.path)
+      .toBe("${{ runner.temp }}/tools-pack-cache");
     expect(saver.concurrency.group).not.toContain("release");
     expect(saver.steps.findIndex((step: { name: string }) => step.name === "Validate source run"))
       .toBeLessThan(saver.steps.findIndex((step: { uses?: string }) => step.uses === "actions/download-artifact@v8"));
