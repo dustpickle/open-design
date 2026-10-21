@@ -25,7 +25,8 @@ runs:
         node .github/scripts/release/cache/windows.ts (Join-Path $env:RUNNER_TEMP "tools-pack-cache") | Tee-Object -FilePath (Join-Path $entry "sizes.json")
         if ($LASTEXITCODE -ne 0) { throw "Cache pruning failed" }
         $archive = python .github/scripts/handoff.py payload-path pack-cache windows --root $root
-        tar -czf $archive -C (Join-Path $env:RUNNER_TEMP "tools-pack-cache") .
+        # Transfer speed matters more than a slightly smaller one-day snapshot.
+        tar --options gzip:compression-level=1 -czf $archive -C (Join-Path $env:RUNNER_TEMP "tools-pack-cache") .
         if ($LASTEXITCODE -ne 0) { throw "Cache snapshot failed" }
         python .github/scripts/handoff.py write-pack-cache --root $root
         if ($LASTEXITCODE -ne 0) { throw "Invalid cache handoff" }

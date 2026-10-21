@@ -4365,6 +4365,7 @@ describe("packaging optimization workflow boundaries", () => {
     expect(composite).toContain("handoff.py artifact-name pack-cache windows");
     expect(composite).toContain("gh workflow run cache-maintenance.yml");
     expect(composite).toContain("compression-level: 0");
+    expect(composite).toContain("gzip:compression-level=1");
   });
 
   it("checks the exact beta build commit independently without changing prerelease delivery gates", async () => {
