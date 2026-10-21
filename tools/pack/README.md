@@ -202,6 +202,8 @@ gh workflow run release-beta.yml --ref <branch> \
 This creates test artifacts and isolated dogfood downloads without changing any
 channel's latest metadata. Windows signing remains off by default. `core`
 checks installation/startup; it does not exercise the full updater lifecycle.
+If the branch's packaged version is behind the current stable/beta feed, add
+`-f force=true` while retaining `-f publish=false` to permit that test build.
 Web source, tests and generated route types are validated in an independent
 same-commit job. Stable retains its existing verification gate; prerelease
 retains its independently dispatched, advisory verification.
