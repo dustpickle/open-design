@@ -105,4 +105,27 @@ describe("Windows cache transfer budget", () => {
       await expect(pruneWindowsCache(fixture, -1)).rejects.toThrow("Invalid cache byte budget");
     } finally { await rm(fixture, { recursive: true, force: true }); }
   });
+
+  it("retains final artifacts for repeat builds while dropping their historical copies", async () => {
+    const fixture = await mkdtemp(join(tmpdir(), "pack-cache-generations-"));
+    try {
+      for (const node of ["win.electron-builder-dir", "win.nsis-installer", "win.portable-zip", "win.launcher-payload"]) {
+        for (const [generation, time] of [["old", 1], ["latest", 2]] as const) {
+          const path = join(fixture, "entries", node, generation);
+          await mkdir(path, { recursive: true });
+          await writeFile(join(path, "manifest.json"), "{}");
+          await writeFile(join(path, "artifact"), `${node}:${generation}`);
+          await utimes(path, time, time);
+        }
+      }
+      const report = await pruneWindowsCache(fixture);
+      expect(report.entries.filter((entry) => entry.kept)).toHaveLength(4);
+      expect(report.entries.filter((entry) => entry.kept).every((entry) => entry.entry === "latest")).toBe(true);
+      for (const entry of report.entries) {
+        const artifact = readFile(join(fixture, "entries", entry.node, entry.entry, "artifact"), "utf8");
+        if (entry.kept) expect(await artifact).toBe(`${entry.node}:latest`);
+        else await expect(artifact).rejects.toThrow();
+      }
+    } finally { await rm(fixture, { recursive: true, force: true }); }
+  });
 });

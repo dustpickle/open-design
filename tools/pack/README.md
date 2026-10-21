@@ -210,9 +210,10 @@ retains its independently dispatched, advisory verification.
 
 Compare build step times separately from queueing, dependency installation,
 Apple notarization/retries, artifact availability, smoke, and cache transfer.
-The Windows outer cache keeps at most the newest workspace build and NSIS base
-entry within a 1.5 GiB payload budget. Final installers, portable ZIPs and
-unpacked trees are reconstructed. The cache snapshot's `sizes.json` reports
+The Windows outer cache keeps at most the newest complete entry per build layer
+within a 6 GiB payload budget. Final installers, portable ZIPs and unpacked trees
+remain reusable: dropping them made same-source repeat builds slower in the
+timing experiment. Historical copies are discarded. The cache snapshot's `sizes.json` reports
 retained/removed bytes by node. Snapshot compression/upload still costs time
 in the build job; saving the GitHub cache and pruning old outer caches run in
 `cache-maintenance.yml`, outside release concurrency. Cache maintenance failure

@@ -2,10 +2,16 @@ import { lstat, readdir, rm } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
-// Keep expensive, version-independent work. Final installers/ZIPs, unpacked
-// trees and historical copies cost more to transfer than to reconstruct.
-export const WINDOWS_CACHE_NODES = ["win.workspace-build", "win.nsis-payload-base"] as const;
-export const WINDOWS_CACHE_MAX_BYTES = 1536 * 1024 * 1024;
+// Keep one complete generation of every build layer, including final artifacts.
+// Reconstructing those artifacts was slower than transferring them in the warm
+// build experiment; savings come from removing historical copies instead.
+export const WINDOWS_CACHE_NODES = [
+  "win.workspace-build", "win.nsis-payload-base", "win.electron-builder-dir",
+  "win.packaged-app", "win.nsis-installer", "win.portable-zip",
+  "win.nsis-payload-overlay", "win.launcher-payload", "win.launcher-payload-base",
+  "win.resource-tree", "win.workspace-tarballs",
+] as const;
+export const WINDOWS_CACHE_MAX_BYTES = 6 * 1024 * 1024 * 1024;
 
 async function bytes(path: string): Promise<number> {
   const info = await lstat(path);
