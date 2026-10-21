@@ -123,6 +123,7 @@ jobs:
               }
             }
             core.setOutput('head_sha', run.head_sha);
+            core.setOutput('source_is_current', run.head_sha === context.sha ? 'true' : 'false');
       - name: Checkout
         uses: actions/checkout@v6.0.2
       - name: Setup Node.js
@@ -170,6 +171,7 @@ jobs:
           path: ${{ runner.temp }}/tools-pack-cache
           key: ${{ steps.cache.outputs.key }}
       - name: Retain newest cache for this ref and channel
+        if: steps.source.outputs.source_is_current == 'true'
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}

@@ -4332,6 +4332,7 @@ describe("packaging optimization workflow boundaries", () => {
     if (scenario.accepted) {
       await result;
       expect(outputs.head_sha).toBe(sourceSha);
+      expect(outputs.source_is_current).toBe(sourceSha === "current" ? "true" : "false");
     } else {
       await expect(result).rejects.toThrow();
       expect(outputs).toEqual({});
@@ -4367,6 +4368,10 @@ describe("packaging optimization workflow boundaries", () => {
     const extract = saver.steps.find((step: { name: string }) => step.name === "Verify and extract cache snapshot");
     expect(extract.env.SOURCE_HEAD_SHA).toBe("${{ steps.source.outputs.head_sha }}");
     expect(extract.run).toContain("$data.head_sha -ne $env:SOURCE_HEAD_SHA");
+    expect(validate).toContain("source_is_current");
+    const retain = saver.steps.find((step: { name: string }) => step.name === "Retain newest cache for this ref and channel");
+    expect(retain.if).toBe("steps.source.outputs.source_is_current == 'true'");
+    expect(retain.run).toContain("--sort created_at");
     const composite = await readFile(join(workspaceRoot, ".github/actions/defer-pack-cache/action.yml"), "utf8");
     expect(composite).toContain("handoff.py artifact-name pack-cache windows");
     expect(composite).toContain("gh workflow run cache-maintenance.yml");
