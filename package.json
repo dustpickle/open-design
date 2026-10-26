@@ -28,6 +28,7 @@
     "typecheck": "pnpm -r --workspace-concurrency=4 --if-present run typecheck && tsc -p scripts/tsconfig.json --noEmit"
   },
   "devDependencies": {
+    "@typescript/native": "npm:typescript@7.0.2",
     "@open-design/components": "workspace:*",
     "@open-design/daemon": "workspace:*",
     "@open-design/tools-dev": "workspace:*",
@@ -36,7 +37,6 @@
     "@open-design/tools-serve": "workspace:*",
     "@types/node": "20.19.39",
     "tsx": "4.22.3",
-    "typescript": "5.9.3",
     "yaml": "2.9.0"
   },
   "engines": {
@@ -46,6 +46,7 @@
   "pnpm": {
     "overrides": {
       "@hono/node-server@^1": "1.19.17",
+      "@modelcontextprotocol/sdk>zod": "4.6.7",
       "@opentelemetry/core@^2": "2.12.0",
       "@xmldom/xmldom@^0.8": "0.8.15",
       "@xmldom/xmldom@^0.9": "0.9.12",
@@ -74,6 +75,7 @@
       "source-map-js": "1.2.2",
       "tar": "7.5.22",
       "tmp": "0.2.7",
+      "tsx>esbuild": "0.28.2",
       "undici@^6": "6.29.1",
       "undici@^7": "7.30.1",
       "vite@^7": "7.3.7",
